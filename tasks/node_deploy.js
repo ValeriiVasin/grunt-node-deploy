@@ -6,45 +6,42 @@
  * Licensed under the MIT license.
  */
 
-'use strict';
+module.exports = function (grunt) {
+  'use strict';
 
-module.exports = function(grunt) {
+  var Deploy = require('./deployHelper').Deploy;
 
-  // Please see the Grunt documentation for more information regarding task
-  // creation: http://gruntjs.com/creating-tasks
+  grunt.registerMultiTask('deploy', 'Simplify your apps deploying', function () {
+    var data = this.data,
+        done = this.async(),
+        args = this.args,
+        deploy;
 
-  grunt.registerMultiTask('node_deploy', 'Deployment tool for grunt.', function() {
-    // Merge task-specific and/or target-specific options with these defaults.
-    var options = this.options({
-      punctuation: '.',
-      separator: ', '
+    // check data
+    ['deployFrom', 'deployTo', 'domain', 'user'].forEach(function (key) {
+      if ( !data[key] ) {
+        throw new Error('You should define `'+ key +'`');
+      }
     });
 
-    // Iterate over all specified file groups.
-    this.files.forEach(function(f) {
-      // Concat specified files.
-      var src = f.src.filter(function(filepath) {
-        // Warn on and remove invalid source files (if nonull was set).
-        if (!grunt.file.exists(filepath)) {
-          grunt.log.warn('Source file "' + filepath + '" not found.');
-          return false;
-        } else {
-          return true;
-        }
-      }).map(function(filepath) {
-        // Read file source.
-        return grunt.file.read(filepath);
-      }).join(grunt.util.normalizelf(options.separator));
-
-      // Handle options.
-      src += options.punctuation;
-
-      // Write the destination file.
-      grunt.file.write(f.dest, src);
-
-      // Print a success message.
-      grunt.log.writeln('File "' + f.dest + '" created.');
+    deploy = new Deploy({
+      user: data.user,
+      domain: data.domain,
+      deployTo: data.deployTo,
+      deployFrom: data.deployFrom,
+      hooks: data.hooks
     });
+
+    if ( args.indexOf('setup') !== -1 ) {
+      // grunt deploy:<env>:setup
+      deploy.setup(done);
+    } else if ( args.indexOf('rollback') !== -1 ) {
+      // grunt deploy:<env>:rollback
+      deploy.rollback(done);
+    } else {
+      deploy.start(done);
+    }
+
   });
-
 };
+
