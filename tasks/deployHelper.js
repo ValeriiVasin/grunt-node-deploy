@@ -233,7 +233,13 @@ Deploy.prototype._trigger = function (name, done) {
  * @param {Object} [data]  Data object that will replace {{variables}} in command
  */
 Deploy.prototype.run = function (command, data) {
-  data = _.extend({}, this._folders, data || {});
+  data = _.extend(
+    {},
+    { user: this._user, domain: this._domain },
+    this._folders,
+    data || {}
+  );
+
   command = _.template(command, data).replace(/\"/g, '\\\"');
 
   this._commands.push('ssh ' + this._host + ' "' + command + '"');
