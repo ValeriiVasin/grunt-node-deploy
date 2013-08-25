@@ -5,9 +5,16 @@
   "newcap": true,
   "noarg": true,
   "sub": true,
-  "undef": true,
   "boss": true,
   "eqnull": true,
   "node": true,
-  "es5": true
+  "globals": {
+    "jasmine": true,
+    "expect": true,
+    "it": true,
+    "xit": true,
+    "describe": true,
+    "xdescribe": true,
+    "spyOn": true
+  }
 }
