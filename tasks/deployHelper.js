@@ -121,16 +121,12 @@ Deploy.prototype._npmInstall = function (done) {
   var that = this;
 
   this._trigger('beforeNpm', function () {
-    that.run('cd {{currentRelease}} && test -f {{currentRelease}}/package.json && npm install');
+    that.run('cd {{currentRelease}} && test -f {{currentRelease}}/package.json && npm install || true');
     that.exec(function (err) {
       if (err) {
-        console.log('--- Error ---');
-        console.log(JSON.stringify(err));
-        console.log('-------------');
+        throw err;
       }
-      /**
-       * @todo  Check errors and throw exception
-       */
+
       that._trigger('afterNpm', done);
     });
   });
