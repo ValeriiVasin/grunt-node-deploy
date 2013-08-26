@@ -204,6 +204,10 @@ Deploy.prototype._trigger = function (name, done) {
     return;
   }
 
+  console.log(
+    (moment().format('YYYY-MM-DD HH:mm:ss') + ' executing ' + '`' + name +'`').green
+  );
+
   hook.call(
     {
       // async hooks execution
