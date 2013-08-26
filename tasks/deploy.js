@@ -17,18 +17,17 @@ module.exports = function (grunt) {
         args = this.args,
         deploy;
 
-    // check data
-    ['deployFrom', 'deployTo', 'domain', 'user'].forEach(function (key) {
-      if ( !data[key] ) {
-        throw new Error('You should define `'+ key +'`');
-      }
-    });
-
+    /**
+     * @todo Check params
+     */
     deploy = new Deploy({
       user: data.user,
       domain: data.domain,
       deployTo: data.deployTo,
       deployFrom: data.deployFrom,
+      repository: data.repository,
+      branch: data.branch,
+      keepReleases: data.keepReleases,
       hooks: data.hooks
     });
 

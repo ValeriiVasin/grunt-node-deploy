@@ -11,34 +11,36 @@ _.templateSettings = {
 
 /**
  * Deploy helper
- * @param {Object} options              Options to set up deploy
- * @param {String} options.user         User deploy from
- * @param {String} options.domain       Remote server domain
- * @param {String} options.deployTo     Remote folder to deploy in
- * @param {String} options.deployFrom   Remote folder to deploy from
- * @param {String} options.keepReleases Amount of releases to keep
+ * @param {Object} options                    Options to set up deploy
+ * @param {String} options.user               User deploy from
+ * @param {String} options.domain             Remote server domain
+ * @param {String} options.deployTo           Remote folder to deploy in
+ *
+ * @param {String} options.repository         Git repository of project
+ * @param {String} [options.branch='master']  Git branch that will be used for deploy
+ *
+ * @param {String} [options.deployFrom]       Remote folder to deploy from
+ * @param {String} [options.keepReleases=3]   Amount of releases to keep
  */
 function Deploy(options) {
-  this._user   = options.user;
-  this._domain = options.domain;
-  this._host   = this._user + '@' + this._domain;
 
-  this._keepReleases = options.keepReleases || 3;
-  this._hooks = options.hooks || {};
-
+  options.branch = options.branch || 'master';
+  options.keepReleases = options.keepReleases || 3;
+  options.hooks = options.hooks || {};
   this.options = options;
 
+
   this._folders = {};
-  this._folders.project = options.deployTo;
-  this._folders.logs = this._folders.project + '/logs';
-  this._folders.shared = this._folders.project + '/shared';
-  this._folders.releases = this._folders.project + '/releases';
+  this._folders.projectPath = options.deployTo;
+  this._folders.logsPath = this._folders.projectPath + '/logs';
+  this._folders.sharedPath = this._folders.projectPath + '/shared';
+  this._folders.releasesPath = this._folders.projectPath + '/releases';
 
   // always symlinked
-  this._folders.current = this._folders.project + '/current';
+  this._folders.currentPath = this._folders.projectPath + '/current';
 
   // will be resolved on deploy start
-  this._folders.currentRelease = null;
+  this._folders.releasePath = null;
 
   this._commands = [];
 }
@@ -46,7 +48,7 @@ function Deploy(options) {
 Deploy.prototype.setup = function (done) {
   console.log('Starting...');
 
-  this.run('mkdir -p {{releases}} {{logs}} {{shared}}');
+  this.run('mkdir -p {{releasesPath}} {{logsPath}} {{sharedPath}}');
 
   this.exec(done);
 };
@@ -59,16 +61,11 @@ Deploy.prototype.start = function (done) {
   function start() {
     var timestamp = moment().format('YYYYMMDDHHmmss');
 
-    that._folders.currentRelease = that._folders.releases + '/' + timestamp;
+    that._folders.releasePath = that._folders.releasesPath + '/' + timestamp;
 
-    var deployCommand = [
-      'rsync -avzq',
-      that.options.deployFrom,
-      that._user + '@' + that._domain + ':' + that._folders.currentRelease
-    ].join(' ');
-
-    exec(deployCommand, npmInstall)
-      .stdout.pipe(process.stdout);
+    that.run('mkdir -p {{releasePath}}');
+    that.run('git clone -q -b {{branch}} {{repository}} {{releasePath}}');
+    that.exec(npmInstall);
   }
 
   /**
@@ -90,8 +87,8 @@ Deploy.prototype.start = function (done) {
       throw err;
     }
 
-    that.run('rm -f {{current}}');
-    that.run('ln -s {{currentRelease}} {{current}}');
+    that.run('rm -f {{currentPath}}');
+    that.run('ln -s {{releasePath}} {{currentPath}}');
     that.exec(cleanup);
   }
 
@@ -119,7 +116,7 @@ Deploy.prototype._npmInstall = function (done) {
   var that = this;
 
   this._trigger('beforeNpm', function () {
-    that.run('cd {{currentRelease}} && test -f {{currentRelease}}/package.json && npm install || true');
+    that.run('cd {{releasePath}} && test -f {{releasePath}}/package.json && npm install || true');
     that.exec(function (err) {
       if (err) {
         throw err;
@@ -133,25 +130,25 @@ Deploy.prototype._npmInstall = function (done) {
 Deploy.prototype.rollback = function (done) {
   var that = this;
 
-  this.run('ls -1 {{releases}}', { quiet: true });
+  this.run('ls -1 {{releasesPath}}', { quiet: true });
   this.exec(rollback);
 
   function rollback(err, results) {
     var ls = results[0].trim(),
         folders = ls.split('\n'),
-        currentRelease,
+        release,
         previousRelease;
 
     if (folders.length < 2) {
       throw 'Rolling back is impossible, there are less then 2 releases.';
     }
 
-    currentRelease = that._folders.releases + '/' + folders[folders.length - 1];
-    previousRelease = that._folders.releases + '/' + folders[folders.length - 2];
+    release = that._folders.releasesPath + '/' + folders[folders.length - 1];
+    previousRelease = that._folders.releasesPath + '/' + folders[folders.length - 2];
 
-    that.run('rm -f {{current}}');
-    that.run('ln -s ' + previousRelease + ' {{current}}');
-    that.run('rm -Rf ' + currentRelease);
+    that.run('rm -f {{currentPath}}');
+    that.run('ln -s ' + previousRelease + ' {{currentPath}}');
+    that.run('rm -Rf ' + release);
     that.exec(done);
   }
 };
@@ -164,7 +161,7 @@ Deploy.prototype.rollback = function (done) {
 Deploy.prototype.cleanup = function (done) {
   var that = this;
 
-  this.run('ls -1 {{releases}}', { quiet: true });
+  this.run('ls -1 {{releasesPath}}', { quiet: true });
   this.exec(function (err, results) {
     var folders,
         foldersToRemove;
@@ -175,10 +172,10 @@ Deploy.prototype.cleanup = function (done) {
 
     // split `ls` command response, trim last \n
     folders = results[0].trim().split('\n');
-    foldersToRemove = folders.slice(0, -that._keepReleases);
+    foldersToRemove = folders.slice(0, -that.options.keepReleases);
 
     foldersToRemove.forEach(function (folder) {
-      that.run('rm -Rf {{releases}}/' + folder);
+      that.run('rm -Rf {{releasesPath}}/' + folder);
     });
 
     that.exec(done);
@@ -190,7 +187,7 @@ Deploy.prototype.cleanup = function (done) {
  */
 Deploy.prototype._trigger = function (name, done) {
   var that = this,
-      hook = this._hooks[name],
+      hook = this.options.hooks[name],
       isHookAsync = false;
 
 
@@ -268,11 +265,7 @@ Deploy.prototype.runLocally = function (command, options) {
  * @return {String}        Expanded command
  */
 Deploy.prototype._expandCommand = function (command) {
-  var data = _.extend(
-    {},
-    { user: this._user, domain: this._domain },
-    this._folders
-  );
+  var data = _.extend({}, this.options, this._folders);
 
   return _.template(command, data);
 };
@@ -285,7 +278,7 @@ Deploy.prototype._remoteCommand = function (command) {
 
   return _.template(
     'ssh -A {{host}} "{{command}}"',
-    { host: this._host, command: command }
+    { host: this.options.user + '@' + this.options.domain, command: command }
   );
 };
 
