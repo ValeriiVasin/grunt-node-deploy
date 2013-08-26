@@ -135,7 +135,7 @@ Deploy.prototype._npmInstall = function (done) {
 Deploy.prototype.rollback = function (done) {
   var that = this;
 
-  this.run('ls -1 {{releases}}', null, { quiet: true });
+  this.run('ls -1 {{releases}}', { quiet: true });
   this.exec(rollback);
 
   function rollback(err, results) {
@@ -152,7 +152,7 @@ Deploy.prototype.rollback = function (done) {
     previousRelease = that._folders.releases + '/' + folders[folders.length - 2];
 
     that.run('rm -f {{current}}');
-    that.run('ln -s {{previousRelease}} {{current}}', { previousRelease: previousRelease });
+    that.run('ln -s ' + previousRelease + ' {{current}}');
     that.run('rm -Rf ' + currentRelease);
     that.exec(done);
   }
@@ -166,7 +166,7 @@ Deploy.prototype.rollback = function (done) {
 Deploy.prototype.cleanup = function (done) {
   var that = this;
 
-  this.run('ls -1 {{releases}}', null, { quiet: true });
+  this.run('ls -1 {{releases}}', { quiet: true });
   this.exec(function (err, results) {
     var folders,
         foldersToRemove;
@@ -231,16 +231,15 @@ Deploy.prototype._trigger = function (name, done) {
  * Add commands for remote execution
  *
  * @param {String}  command                 Command to execute
- * @param {Object}  [data]                  Data object that will replace {{variables}} in command
  * @param {Object}  [options]               Command execution options
  * @param {Boolean} [options.local=false]   Run command locally
  * @param {Boolean} [options.quiet=false]   Do not show output on the screen
  */
-Deploy.prototype.run = function (command, data, options) {
+Deploy.prototype.run = function (command, options) {
   options = _.extend({ quiet: false, local: false }, options || {});
 
   this._commands.push({
-    command: this._expandCommand(command, data),
+    command: this._expandCommand(command),
     local: options.local,
     quiet: options.quiet
   });
@@ -250,30 +249,26 @@ Deploy.prototype.run = function (command, data, options) {
  * Add commands for local execution
  *
  * @param {String}  command                 Command to execute
- * @param {Object}  [data]                  Data object that will replace {{variables}} in command
  * @param {Object}  [options]               Command execution options
  * @param {Boolean} [options.quiet=false]   Do not show output on the screen
  */
-Deploy.prototype.runLocally = function (command, data, options) {
+Deploy.prototype.runLocally = function (command, options) {
   options = _.extend({ quiet: false }, options || {});
   options.local = true;
-  this.run(command, data, options);
+  this.run(command, options);
 };
 
 /**
- * Expand command: augment with variables
+ * Expand command: augment with variables, e.g. folders, user, domain
  *
  * @param {String} command Command to expand
- * @param {Object} [data]  Additional data for expanding
- *
- * @return {String} Expanded command
+ * @return {String}        Expanded command
  */
-Deploy.prototype._expandCommand = function (command, data) {
-  data = _.extend(
+Deploy.prototype._expandCommand = function (command) {
+  var data = _.extend(
     {},
     { user: this._user, domain: this._domain },
-    this._folders,
-    data || {}
+    this._folders
   );
 
   return _.template(command, data);
