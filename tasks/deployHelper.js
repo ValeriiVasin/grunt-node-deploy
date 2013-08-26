@@ -135,7 +135,7 @@ Deploy.prototype._npmInstall = function (done) {
 Deploy.prototype.rollback = function (done) {
   var that = this;
 
-  this.run('ls -1 {{releases}}');
+  this.run('ls -1 {{releases}}', null, { quiet: true });
   this.exec(rollback);
 
   function rollback(err, results) {
@@ -166,7 +166,7 @@ Deploy.prototype.rollback = function (done) {
 Deploy.prototype.cleanup = function (done) {
   var that = this;
 
-  this.run('ls -1 {{releases}}');
+  this.run('ls -1 {{releases}}', null, { quiet: true });
   this.exec(function (err, results) {
     var folders,
         foldersToRemove;
@@ -230,27 +230,34 @@ Deploy.prototype._trigger = function (name, done) {
 /**
  * Add commands for remote execution
  *
- * @param {String} command Command to execute
- * @param {Object} [data]  Data object that will replace {{variables}} in command
+ * @param {String}  command                 Command to execute
+ * @param {Object}  [data]                  Data object that will replace {{variables}} in command
+ * @param {Object}  [options]               Command execution options
+ * @param {Boolean} [options.local=false]   Run command locally
+ * @param {Boolean} [options.quiet=false]   Do not show output on the screen
  */
-Deploy.prototype.run = function (command, data) {
+Deploy.prototype.run = function (command, data, options) {
+  options = _.extend({ quiet: false, local: false }, options || {});
+
   this._commands.push({
     command: this._expandCommand(command, data),
-    local: false
+    local: options.local,
+    quiet: options.quiet
   });
 };
 
 /**
  * Add commands for local execution
  *
- * @param {String} command Command to execute
- * @param {Object} [data]  Data object that will replace {{variables}} in command
+ * @param {String}  command                 Command to execute
+ * @param {Object}  [data]                  Data object that will replace {{variables}} in command
+ * @param {Object}  [options]               Command execution options
+ * @param {Boolean} [options.quiet=false]   Do not show output on the screen
  */
-Deploy.prototype.runLocally = function (command, data) {
-  this._commands.push({
-    command: this._expandCommand(command, data),
-    local: true
-  });
+Deploy.prototype.runLocally = function (command, data, options) {
+  options = _.extend({ quiet: false }, options || {});
+  options.local = true;
+  this.run(command, data, options);
 };
 
 /**
@@ -303,8 +310,10 @@ Deploy.prototype.exec = function (done) {
       callback
     );
 
-    _exec.stdout.pipe(process.stdout);
-    _exec.stderr.pipe(process.stderr);
+    if ( !command.quiet ) {
+      _exec.stdout.pipe(process.stdout);
+      _exec.stderr.pipe(process.stderr);
+    }
   }, function () {
     that._commands = [];
     done.apply(null, arguments);
