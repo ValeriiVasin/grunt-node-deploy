@@ -37,7 +37,8 @@
     "async": "~0.2.9",
     "moment": "~2.1.0",
     "jasmine-node": "~1.11.0",
-    "grunt-contrib-jasmine-node": "~0.1.1"
+    "grunt-contrib-jasmine-node": "~0.1.1",
+    "colors": "~0.6.2"
   },
   "peerDependencies": {
     "grunt": "~0.4.1"

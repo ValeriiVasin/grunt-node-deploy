@@ -214,7 +214,8 @@ Deploy.prototype._trigger = function (name, done) {
       }
     },
 
-    this.run.bind(this)
+    this.run.bind(this),
+    this.runLocally.bind(this)
   );
 
   if ( !isHookAsync ) {
@@ -227,12 +228,40 @@ Deploy.prototype._trigger = function (name, done) {
 };
 
 /**
- * Add commands to remote execution array
+ * Add commands for remote execution
  *
  * @param {String} command Command to execute
  * @param {Object} [data]  Data object that will replace {{variables}} in command
  */
 Deploy.prototype.run = function (command, data) {
+  this._commands.push({
+    command: this._expandCommand(command, data),
+    local: false
+  });
+};
+
+/**
+ * Add commands for local execution
+ *
+ * @param {String} command Command to execute
+ * @param {Object} [data]  Data object that will replace {{variables}} in command
+ */
+Deploy.prototype.runLocally = function (command, data) {
+  this._commands.push({
+    command: this._expandCommand(command, data),
+    local: true
+  });
+};
+
+/**
+ * Expand command: augment with variables
+ *
+ * @param {String} command Command to expand
+ * @param {Object} [data]  Additional data for expanding
+ *
+ * @return {String} Expanded command
+ */
+Deploy.prototype._expandCommand = function (command, data) {
   data = _.extend(
     {},
     { user: this._user, domain: this._domain },
@@ -240,9 +269,19 @@ Deploy.prototype.run = function (command, data) {
     data || {}
   );
 
-  command = _.template(command, data).replace(/\"/g, '\\\"');
+  return _.template(command, data);
+};
 
-  this._commands.push('ssh ' + this._host + ' "' + command + '"');
+/**
+ * Convert command to remote
+ */
+Deploy.prototype._remoteCommand = function (command) {
+  command = command.replace(/\"/g, '\\\"');
+
+  return _.template(
+    'ssh -A {{host}} "{{command}}"',
+    { host: this._host, command: command }
+  );
 };
 
 /**
@@ -254,17 +293,32 @@ Deploy.prototype.exec = function (done) {
   var that = this;
 
   async.mapSeries(this._commands, function (command, callback) {
-    var _command;
+    var _exec,
+        cmd = command.command;
 
-    console.log(command);
+    that.log(command);
 
-    _command = exec(command, callback);
-    _command.stdout.pipe(process.stdout);
-    _command.stderr.pipe(process.stderr);
+    _exec = exec(
+      command.local ? cmd : that._remoteCommand(cmd),
+      callback
+    );
+
+    _exec.stdout.pipe(process.stdout);
+    _exec.stderr.pipe(process.stderr);
   }, function () {
     that._commands = [];
     done.apply(null, arguments);
   });
+};
+
+Deploy.prototype.log = function (command) {
+  var isLocal = command.local,
+      cmd     = command.command,
+      log     = '* ';
+
+  log = '*' + (' executing ' + (isLocal ? 'locally: ' : '') + '"' + cmd + '"').yellow;
+
+  console.log(log);
 };
 
 module.exports = {
