@@ -46,9 +46,7 @@ function Deploy(options) {
 Deploy.prototype.setup = function (done) {
   console.log('Starting...');
 
-  this.run('mkdir -p {{releases}}');
-  this.run('mkdir -p {{logs}}');
-  this.run('mkdir -p {{shared}}');
+  this.run('mkdir -p {{releases}} {{logs}} {{shared}}');
 
   this.exec(done);
 };
@@ -194,6 +192,7 @@ Deploy.prototype._trigger = function (name, done) {
   var that = this,
       hook = this._hooks[name],
       isHookAsync = false;
+
 
   if (typeof hook === 'undefined') {
     // hook is not defined
