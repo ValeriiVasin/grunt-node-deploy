@@ -259,30 +259,6 @@ Deploy.prototype.runLocally = function (command, options) {
 };
 
 /**
- * Expand command: augment with variables, e.g. folders, user, domain
- *
- * @param {String} command Command to expand
- * @return {String}        Expanded command
- */
-Deploy.prototype._expandCommand = function (command) {
-  var data = _.extend({}, this.options, this._folders);
-
-  return _.template(command, data);
-};
-
-/**
- * Convert command to remote
- */
-Deploy.prototype._remoteCommand = function (command) {
-  command = command.replace(/\"/g, '\\\"');
-
-  return _.template(
-    'ssh -A {{host}} "{{command}}"',
-    { host: this.options.user + '@' + this.options.domain, command: command }
-  );
-};
-
-/**
  * Execute stored commands
  *
  * @param  {Function} done Callback that will be called when all commands executed
@@ -309,6 +285,30 @@ Deploy.prototype.exec = function (done) {
     that._commands = [];
     done.apply(null, arguments);
   });
+};
+
+/**
+ * Expand command: augment with variables, e.g. folders, user, domain
+ *
+ * @param {String} command Command to expand
+ * @return {String}        Expanded command
+ */
+Deploy.prototype._expandCommand = function (command) {
+  var data = _.extend({}, this.options, this._folders);
+
+  return _.template(command, data);
+};
+
+/**
+ * Convert command to remote
+ */
+Deploy.prototype._remoteCommand = function (command) {
+  command = command.replace(/\"/g, '\\\"');
+
+  return _.template(
+    'ssh -A {{host}} "{{command}}"',
+    { host: this.options.user + '@' + this.options.domain, command: command }
+  );
 };
 
 Deploy.prototype.log = function (command) {
