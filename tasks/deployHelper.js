@@ -4,6 +4,7 @@ var async  = require('async');
 var exec   = require('child_process').exec;
 var moment = require('moment');
 var _      = require('underscore');
+var path   = require('path');
 
 _.templateSettings = {
   interpolate : /\{\{(.+?)\}\}/g
@@ -22,27 +23,46 @@ _.templateSettings = {
  * @param {String} [options.deployFrom]       Remote folder to deploy from
  * @param {String} [options.keepReleases=3]   Amount of releases to keep
  */
-function Deploy(options) {
+function Deploy(options, done) {
+  var releaseName = moment().format('YYYYMMDDHHmmss'),
+      that = this;
+
+  this.options = options;
+  this._commands = [];
 
   options.branch = options.branch || 'master';
   options.keepReleases = options.keepReleases || 3;
   options.hooks = options.hooks || {};
-  this.options = options;
 
+  this._folders = {
+    logsPath:     path.join(options.deployTo, '/logs'),
+    sharedPath:   path.join(options.deployTo, '/shared'),
+    releasesPath: path.join(options.deployTo, '/releases'),
 
-  this._folders = {};
-  this._folders.projectPath = options.deployTo;
-  this._folders.logsPath = this._folders.projectPath + '/logs';
-  this._folders.sharedPath = this._folders.projectPath + '/shared';
-  this._folders.releasesPath = this._folders.projectPath + '/releases';
+    currentPath:  path.join(options.deployTo, '/current'),
+  };
 
-  // always symlinked
-  this._folders.currentPath = this._folders.projectPath + '/current';
+  this._folders.releasePath = path.join(this._folders.releasesPath, releaseName);
 
-  // will be resolved on deploy start
-  this._folders.releasePath = null;
+  this.run('ls -1 {{releasesPath}}', { quiet: true });
+  this.exec(function (err, results) {
+    var ls = results[0],
+        releases = ls.trim().split('\n'),
+        length = releases.length,
+        folders = that._folders;
 
-  this._commands = [];
+    console.log(JSON.stringify(releases));
+
+    _.extend(folders, {
+      currentRelease:  length > 0 ? path.join(folders.releasesPath, releases[length - 1]) : null,
+      previousRelease: length > 1 ? path.join(folders.releasesPath, releases[length - 2]) : null,
+    });
+
+    // for current release it will be redefined to {{releasePath}}
+    folders.latestRelease = folders.currentRelease;
+
+    done();
+  });
 }
 
 Deploy.prototype.setup = function (done) {
@@ -56,13 +76,10 @@ Deploy.prototype.setup = function (done) {
 Deploy.prototype.start = function (done) {
   var that = this;
 
+  this._folders.latestRelease = this._folders.releasePath;
   this._trigger('beforeDeploy', start);
 
   function start() {
-    var timestamp = moment().format('YYYYMMDDHHmmss');
-
-    that._folders.releasePath = that._folders.releasesPath + '/' + timestamp;
-
     that.run('mkdir -p {{releasePath}}');
     that.run('git clone -q -b {{branch}} {{repository}} {{releasePath}}');
     that.exec(npmInstall);

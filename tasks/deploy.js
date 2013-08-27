@@ -29,18 +29,17 @@ module.exports = function (grunt) {
       branch: data.branch,
       keepReleases: data.keepReleases,
       hooks: data.hooks
+    }, function init() {
+      if ( args.indexOf('setup') !== -1 ) {
+        // grunt deploy:<env>:setup
+        deploy.setup(done);
+      } else if ( args.indexOf('rollback') !== -1 ) {
+        // grunt deploy:<env>:rollback
+        deploy.rollback(done);
+      } else {
+        deploy.start(done);
+      }
     });
-
-    if ( args.indexOf('setup') !== -1 ) {
-      // grunt deploy:<env>:setup
-      deploy.setup(done);
-    } else if ( args.indexOf('rollback') !== -1 ) {
-      // grunt deploy:<env>:rollback
-      deploy.rollback(done);
-    } else {
-      deploy.start(done);
-    }
-
   });
 };
 
