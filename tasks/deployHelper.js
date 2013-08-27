@@ -161,25 +161,12 @@ Deploy.prototype.rollback = function (done) {
 Deploy.prototype.cleanup = function (done) {
   var that = this;
 
-  this.run('ls -1 {{releasesPath}}', { quiet: true });
-  this.exec(function (err, results) {
-    var folders,
-        foldersToRemove;
-
-    if (err) {
-      throw err;
-    }
-
-    // split `ls` command response, trim last \n
-    folders = results[0].trim().split('\n');
-    foldersToRemove = folders.slice(0, -that.options.keepReleases);
-
-    foldersToRemove.forEach(function (folder) {
-      that.run('rm -Rf {{releasesPath}}/' + folder);
-    });
-
-    that.exec(done);
-  });
+  this.run([
+    'ls -1td {{releasesPath}}/*',
+    'tail -n +' + (this.options.keepReleases + 1),
+    'xargs rm -rf'
+  ].join(' | '), { quiet: true });
+  this.exec(done);
 };
 
 /**
