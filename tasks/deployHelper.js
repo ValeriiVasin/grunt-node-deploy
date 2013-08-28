@@ -325,7 +325,7 @@ Deploy.prototype.invokeTask = function (name, done) {
       taskFn = this._tasks[name],
       run = this.run.bind(this),
       runLocally = this.runLocally.bind(this),
-      isTaskAsync = false,
+      isTaskSync = true,
       taskContext;
 
   if ( typeof taskFn !== 'function' ) {
@@ -347,7 +347,7 @@ Deploy.prototype.invokeTask = function (name, done) {
     runLocally: runLocally,
     onRollback: onRollback,
     async: function () {
-      isTaskAsync = true;
+      isTaskSync = false;
       return taskDone;
     }
   };
@@ -368,9 +368,13 @@ Deploy.prototype.invokeTask = function (name, done) {
     return;
   }
 
-  // task successfully executed
-  if ( !isTaskAsync ) {
-    taskDone();
+      return;
+    }
+
+    // task successfully executed
+    if ( isTaskSync ) {
+      taskDone();
+    }
   }
 
   function onRollback(rollbackFn) {
