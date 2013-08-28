@@ -352,21 +352,22 @@ Deploy.prototype.invokeTask = function (name, done) {
     }
   };
 
-  // invoke task
-  try {
-    console.log('Executing task: `'+ name +'`');
-    taskFn.call(taskContext, run, runLocally, onRollback);
-  } catch (e) {
-    console.log('Rolling back...');
-    this._idle = true;
+  // we should flush all commands before invoking task
+  this.exec(invokeTask);
 
-    async.eachSeries(this._rollbacks, invokeRollback, function () {
-      console.log('Rolling back done...');
-      done();
-    });
+  function invokeTask() {
+    // invoke task
+    try {
+      console.log('Executing task: `'+ name +'`');
+      taskFn.call(taskContext, run, runLocally, onRollback);
+    } catch (e) {
+      console.log('Rolling back...');
+      that._idle = true;
 
-    return;
-  }
+      async.eachSeries(that._rollbacks, invokeRollback, function () {
+        console.log('Rolling back done...');
+        done();
+      });
 
       return;
     }
