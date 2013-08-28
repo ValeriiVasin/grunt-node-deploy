@@ -66,17 +66,19 @@ function Deploy(options, done) {
     // for current release it will be redefined to {{releasePath}}
     folders.latestRelease = folders.currentRelease;
 
+    registerTasks();
     done();
   });
+
+  function registerTasks() {
+    var task = that.task.bind(that),
+        invokeTask = that.invokeTask.bind(that);
+
+    task('setup', function (run) {
+      run('mkdir -p {{releasesPath}} {{logsPath}} {{sharedPath}}');
+    });
+  }
 }
-
-Deploy.prototype.setup = function (done) {
-  console.log('Starting...');
-
-  this.run('mkdir -p {{releasesPath}} {{logsPath}} {{sharedPath}}');
-
-  this.exec(done);
-};
 
 Deploy.prototype.start = function (done) {
   var that = this;
