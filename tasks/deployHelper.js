@@ -301,10 +301,16 @@ Deploy.prototype.exec = function (done) {
  *   @param {Function} [onRollback] Register rollback function
  */
 Deploy.prototype.task = function (name, taskFn) {
-  if (typeof taskFn === 'function') {
-    // task definition
-    this._tasks[name] = taskFn;
+  if (typeof taskFn === 'undefined') {
+    taskFn = function () {};
   }
+
+  if (typeof taskFn !== 'function') {
+    throw 'You should provide function as `taskFn`';
+  }
+
+  // task definition
+  this._tasks[name] = taskFn;
 };
 
 /**
