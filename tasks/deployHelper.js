@@ -12,6 +12,10 @@ _.templateSettings = {
 
 /**
  * Deploy helper
+ *
+ * @class Deploy
+ * @constructor
+ *
  * @param {Object} options                    Options to set up deploy
  * @param {String} options.user               User deploy from
  * @param {String} options.domain             Remote server domain
@@ -29,6 +33,9 @@ function Deploy(options, done) {
 
   this.options = options;
   this._commands = [];
+
+  this._tasks = {};
+  this._rollbacks = [];
 
   options.branch = options.branch || 'master';
   options.keepReleases = options.keepReleases || 3;
@@ -277,6 +284,109 @@ Deploy.prototype.exec = function (done) {
     that._commands = [];
     done.apply(null, arguments);
   });
+};
+
+
+/**
+ * Register task
+ *
+ * @method task
+ *
+ * @param {String}   name           Task name
+ * @param {Function} taskFn         Task function
+ *   @param {Function} [run]        Run commands remotely
+ *   @param {Function} [runLocally] Run commands on current machine
+ *   @param {Function} [onRollback] Register rollback function
+ */
+Deploy.prototype.task = function (name, taskFn) {
+  if (typeof taskFn === 'function') {
+    // task definition
+    this._tasks[name] = taskFn;
+  }
+};
+
+/**
+ * Invoke registered function
+ *
+ * @method invokeTask
+ * @param  {String}   name Task name
+ * @param  {Function} done Done callback
+ */
+Deploy.prototype.invokeTask = function (name, done) {
+  var that = this,
+      taskFn = this._tasks[name],
+      run = this.run.bind(this),
+      runLocally = this.runLocally.bind(this),
+      isTaskAsync = false,
+      taskContext;
+
+  if ( typeof taskFn !== 'function' ) {
+    done();
+    return;
+  }
+
+  if (typeof done !== 'function') {
+    throw 'Invoke task `'+ name +'`. You should provide `done` callback.';
+  }
+
+  // rollback happened before
+  if (this._idle) {
+    return;
+  }
+
+  taskContext = {
+    run: run,
+    runLocally: runLocally,
+    onRollback: onRollback,
+    async: function () {
+      isTaskAsync = true;
+      return taskDone;
+    }
+  };
+
+  // invoke task
+  try {
+    console.log('Executing task: `'+ name +'`');
+    taskFn.call(taskContext, run, runLocally, onRollback);
+  } catch (e) {
+    console.log('Rolling back...');
+    this._idle = true;
+
+    async.eachSeries(this._rollbacks, invokeRollback, function () {
+      console.log('Rolling back done...');
+      done();
+    });
+
+    return;
+  }
+
+  // task successfully executed
+  if ( !isTaskAsync ) {
+    taskDone();
+  }
+
+  function onRollback(rollbackFn) {
+    that._rollbacks.unshift(rollbackFn);
+  }
+
+  function taskDone() {
+    that.exec(done);
+  }
+
+  function invokeRollback(rollbackFn, done) {
+    var isAsync = false;
+
+    rollbackFn.call({
+      async: function () {
+        isAsync = true;
+        return done;
+      }
+    });
+
+    if ( !isAsync ) {
+      done();
+    }
+  }
 };
 
 /**
