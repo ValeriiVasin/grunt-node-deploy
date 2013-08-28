@@ -77,6 +77,24 @@ function Deploy(options, done) {
     task('setup', function (run) {
       run('mkdir -p {{releasesPath}} {{logsPath}} {{sharedPath}}');
     });
+
+    // restart your app, currently it's empty, could be redefined
+    task('restart');
+
+    // Rollback
+    task('rollback', function (run) {
+      if ( that._folders.previousRelease ) {
+        run('rm -Rf {{currentPath}}; ln -s {{previousRelease}} {{currentPath}}');
+        invokeTask('rollback:cleanup', this.async());
+      } else {
+        throw 'Rolling back is impossible, there are less then 2 releases.';
+      }
+    });
+
+    // internal
+    task('rollback:cleanup', function (run) {
+      run('if [ `readlink {{currentPath}}` != {{currentRelease}} ]; then rm -rf {{currentRelease}}; fi');
+    });
   }
 }
 

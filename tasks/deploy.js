@@ -35,7 +35,7 @@ module.exports = function (grunt) {
         deploy.invokeTask('setup', done);
       } else if ( args.indexOf('rollback') !== -1 ) {
         // grunt deploy:<env>:rollback
-        deploy.rollback(done);
+        deploy.invokeTask('rollback', done);
       } else {
         deploy.start(done);
       }
