@@ -51,8 +51,6 @@ function Deploy(options, done) {
         length = releases.length,
         folders = that._folders;
 
-    console.log(JSON.stringify(releases));
-
     _.extend(folders, {
       currentRelease:  length > 0 ? path.join(folders.releasesPath, releases[length - 1]) : null,
       previousRelease: length > 1 ? path.join(folders.releasesPath, releases[length - 2]) : null,
@@ -147,25 +145,15 @@ Deploy.prototype._npmInstall = function (done) {
 Deploy.prototype.rollback = function (done) {
   var that = this;
 
-  this.run('ls -1 {{releasesPath}}', { quiet: true });
-  this.exec(rollback);
+  if (this._folders.previousRelease) {
+    this.run('rm -Rf {{currentPath}}; ln -s {{previousRelease}} {{currentPath}}');
+    this.exec(rollbackCleanup);
+  } else {
+    throw 'Rolling back is impossible, there are less then 2 releases.';
+  }
 
-  function rollback(err, results) {
-    var ls = results[0].trim(),
-        folders = ls.split('\n'),
-        release,
-        previousRelease;
-
-    if (folders.length < 2) {
-      throw 'Rolling back is impossible, there are less then 2 releases.';
-    }
-
-    release = that._folders.releasesPath + '/' + folders[folders.length - 1];
-    previousRelease = that._folders.releasesPath + '/' + folders[folders.length - 2];
-
-    that.run('rm -f {{currentPath}}');
-    that.run('ln -s ' + previousRelease + ' {{currentPath}}');
-    that.run('rm -Rf ' + release);
+  function rollbackCleanup() {
+    that.run('if [ `readlink {{currentPath}}` != {{currentRelease}} ]; then rm -rf {{currentRelease}}; fi');
     that.exec(done);
   }
 };
@@ -243,7 +231,7 @@ Deploy.prototype.run = function (command, options) {
   options = _.extend({ quiet: false, local: false }, options || {});
 
   this._commands.push({
-    command: this._expandCommand(command),
+    command: this._shellEscape( this._expandCommand(command) ),
     local: options.local,
     quiet: options.quiet
   });
@@ -307,8 +295,6 @@ Deploy.prototype._expandCommand = function (command) {
  * Convert command to remote
  */
 Deploy.prototype._remoteCommand = function (command) {
-  command = command.replace(/\"/g, '\\\"');
-
   return _.template(
     'ssh -A {{host}} "{{command}}"',
     { host: this.options.user + '@' + this.options.domain, command: command }
@@ -323,6 +309,10 @@ Deploy.prototype.log = function (command) {
   log = '*' + (' executing ' + (isLocal ? 'locally: ' : '') + '"' + cmd + '"').yellow;
 
   console.log(log);
+};
+
+Deploy.prototype._shellEscape = function (str) {
+  return str.replace(/([\`\[\]\"\'])/g, '\\$1');
 };
 
 module.exports = {
