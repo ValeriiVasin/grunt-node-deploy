@@ -37,6 +37,10 @@ function Deploy(options, done) {
   this._tasks = {};
   this._rollbacks = [];
 
+  // before and after tasks hashes
+  this._before = {};
+  this._after  = {};
+
   options.branch = options.branch || 'master';
   options.keepReleases = options.keepReleases || 3;
   options.hooks = options.hooks || {};
@@ -67,6 +71,7 @@ function Deploy(options, done) {
     folders.latestRelease = folders.currentRelease;
 
     registerTasks();
+    registerHooks();
     done();
   });
 
@@ -125,6 +130,52 @@ function Deploy(options, done) {
         'xargs rm -rf'
       ].join(' | '), { quiet: true });
     });
+  }
+
+  /**
+   * Register user-callbacks defined tasks
+   */
+  function registerHooks() {
+    var hooks  = options.hooks,
+        task   = that.task.bind(that),
+        before = that.before.bind(that),
+        after  = that.after.bind(that);
+
+    // register user tasks
+    task('beforeDeploy', hooks.beforeDeploy);
+
+    task('beforeUpdateCode', hooks.beforeUpdateCode);
+    task('afterUpdateCode', hooks.afterUpdateCode);
+
+    task('beforeNpm', hooks.beforeNpm);
+    task('afterNpm', hooks.afterNpm);
+
+    task('beforeSymlink', hooks.beforeSymlink);
+    task('afterSymlink', hooks.afterSymlink);
+
+    task('beforeRestart', hooks.beforeRestart);
+    task('afterRestart', hooks.afterRestart);
+
+    task('afterDeploy', hooks.afterDeploy);
+
+    // register hooks
+    before('deploy', 'beforeDeploy');
+
+    before('updateCode', 'beforeUpdateCode');
+    after('updateCode', 'afterUpdateCode');
+
+    // name of the hook differs from name of the task
+    before('npmInstall', 'beforeNpm');
+    after('npmInstall', 'afterNpm');
+
+    // name of the hook differs from name of the task
+    before('createSymlink', 'beforeSymlink');
+    after('createSymlink', 'afterSymlink');
+
+    before('restart', 'beforeRestart');
+    after('restart', 'afterRestart');
+
+    after('deploy', 'afterDeploy');
   }
 }
 
@@ -344,11 +395,10 @@ Deploy.prototype.exec = function (done) {
  *
  * @param {String}   name           Task name
  * @param {Function} taskFn         Task function
- *   @param {Function} [run]        Run commands remotely
- *   @param {Function} [runLocally] Run commands on current machine
- *   @param {Function} [onRollback] Register rollback function
+ * @param {Object}   [options]      Task options
+ * @param {Boolean}  [internal]     Internal task or not
  */
-Deploy.prototype.task = function (name, taskFn) {
+Deploy.prototype.task = function (name, taskFn, options) {
   if (typeof taskFn === 'undefined') {
     taskFn = function () {};
   }
@@ -362,9 +412,57 @@ Deploy.prototype.task = function (name, taskFn) {
 };
 
 /**
+ * Register before task
+ *
+ * @method  before
+ *
+ * @param  {String} task        Task before which `beforeTask` should be run
+ * @param  {String} beforeTask  Task that should be registered for run before `task`
+ * @example
+ *
+ *     // run `mytask` before task `deploy`
+ *     this.before('deploy', 'mytask');
+ */
+Deploy.prototype.before = function (task, beforeTask) {
+  var beforeTasks = this._before[task];
+
+  if ( !Array.isArray(beforeTasks) ) {
+    this._before[task] = [beforeTask];
+    return;
+  }
+
+  beforeTasks.push(beforeTask);
+};
+
+/**
+ * Register after task
+ *
+ * @method  after
+ *
+ * @param  {String} task        Task after which `afterTask` should be run
+ * @param  {String} beforeTask  Task that should be registered for run before `task`
+ * @example
+ *
+ *     // run `mytask` before task `deploy`
+ *     this.after('deploy', 'mytask');
+ */
+Deploy.prototype.after = function (task, afterTask) {
+  var afterTasks = this._after[task];
+
+  if ( !Array.isArray(afterTasks) ) {
+    this._after[task] = [afterTask];
+    return;
+  }
+
+  afterTasks.push(afterTask);
+};
+
+
+/**
  * Invoke registered function
  *
  * @method invokeTask
+ *
  * @param  {String}   name Task name
  * @param  {Function} done Done callback
  */
@@ -390,20 +488,47 @@ Deploy.prototype.invokeTask = function (name, done) {
     return;
   }
 
-  taskContext = {
-    run: run,
-    runLocally: runLocally,
-    onRollback: onRollback,
-    async: function () {
-      isTaskSync = false;
-      return taskDone;
-    }
-  };
-
   // we should flush all commands before invoking task
-  this.exec(invokeTask);
 
-  function invokeTask() {
+  async.series([
+    function execCommands(callback) {
+      that.exec(callback);
+    },
+
+    function invokeBeforeTasks(callback) {
+      var beforeTasks = that._before[name];
+
+      if (beforeTasks) {
+        that.invokeTasks(beforeTasks, callback);
+      } else {
+        callback();
+      }
+    },
+
+    invokeTask,
+
+    function invokeAfterTasks(callback) {
+      var afterTasks = that._after[name];
+
+      if (afterTasks) {
+        that.invokeTasks(afterTasks, callback);
+      } else {
+        callback();
+      }
+    }
+  ], done);
+
+  function invokeTask(callback) {
+    var taskContext = {
+      run: run,
+      runLocally: runLocally,
+      onRollback: onRollback,
+      async: function () {
+        isTaskSync = false;
+        return taskDone;
+      }
+    };
+
     // invoke task
     try {
       console.log('Executing task: `'+ name +'`');
@@ -414,7 +539,7 @@ Deploy.prototype.invokeTask = function (name, done) {
 
       async.eachSeries(that._rollbacks, invokeRollback, function () {
         console.log('Rolling back done...');
-        done();
+        callback();
       });
 
       return;
@@ -424,14 +549,14 @@ Deploy.prototype.invokeTask = function (name, done) {
     if ( isTaskSync ) {
       taskDone();
     }
+
+    function taskDone() {
+      that.exec(callback);
+    }
   }
 
   function onRollback(rollbackFn) {
     that._rollbacks.unshift(rollbackFn);
-  }
-
-  function taskDone() {
-    that.exec(done);
   }
 
   function invokeRollback(rollbackFn, done) {
