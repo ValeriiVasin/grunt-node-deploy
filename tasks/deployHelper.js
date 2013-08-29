@@ -91,9 +91,39 @@ function Deploy(options, done) {
       }
     });
 
-    // internal
     task('rollback:cleanup', function (run) {
       run('if [ `readlink {{currentPath}}` != {{currentRelease}} ]; then rm -rf {{currentRelease}}; fi');
+    });
+
+    // Deploy
+    task('deploy', function (run) {
+      that._folders.latestRelease = that._folders.releasePath;
+      run('mkdir -p {{releasePath}}');
+
+      that.invokeTasks(
+        ['updateCode', 'npmInstall', 'createSymlink', 'restart', 'deploy:cleanup'],
+        this.async()
+      );
+    });
+
+    task('updateCode', function (run) {
+      run('git clone -q -b {{branch}} {{repository}} {{releasePath}}');
+    });
+
+    task('npmInstall', function (run) {
+      run('cd {{releasePath}} && test -f {{releasePath}}/package.json && npm install || true');
+    });
+
+    task('createSymlink', function (run) {
+      run('rm -f {{currentPath}} && ln -s {{latestRelease}} {{currentPath}}');
+    });
+
+    task('deploy:cleanup', function (run) {
+      run([
+        'ls -1td {{releasesPath}}/*',
+        'tail -n +' + (that.options.keepReleases + 1),
+        'xargs rm -rf'
+      ].join(' | '), { quiet: true });
     });
   }
 }
@@ -418,6 +448,19 @@ Deploy.prototype.invokeTask = function (name, done) {
       done();
     }
   }
+};
+
+/**
+ * @method invokeTasks
+ * @param {String[]} tasks  Array of tasks to invoke
+ * @param {Function} done   Callback
+ */
+Deploy.prototype.invokeTasks = function (tasks, done) {
+  var that = this;
+
+  async.eachSeries(tasks, function (name, callback) {
+    that.invokeTask(name, callback);
+  }, done);
 };
 
 /**

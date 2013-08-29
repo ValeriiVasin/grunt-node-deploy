@@ -37,7 +37,7 @@ module.exports = function (grunt) {
         // grunt deploy:<env>:rollback
         deploy.invokeTask('rollback', done);
       } else {
-        deploy.start(done);
+        deploy.invokeTask('deploy', done);
       }
     });
   });
