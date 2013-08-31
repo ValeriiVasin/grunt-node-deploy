@@ -43,7 +43,7 @@ function Deploy(options, done) {
 
   options.branch = options.branch || 'master';
   options.keepReleases = options.keepReleases || 3;
-  options.hooks = options.hooks || {};
+  options.tasks = options.tasks || {};
 
   this._folders = {
     logsPath:     path.join(options.deployTo, '/logs'),
@@ -71,7 +71,7 @@ function Deploy(options, done) {
     folders.latestRelease = folders.currentRelease;
 
     registerTasks();
-    registerHooks();
+    registerUserTasks();
     done();
   });
 
@@ -135,40 +135,29 @@ function Deploy(options, done) {
   /**
    * Register user-callbacks defined tasks
    */
-  function registerHooks() {
-    var hooks  = options.hooks,
+  function registerUserTasks() {
+    var tasks  = options.tasks,
         task   = that.task.bind(that),
         before = that.before.bind(that),
-        after  = that.after.bind(that);
+        after  = that.after.bind(that),
+        taskName;
 
     // register user tasks
-    task('beforeDeploy', hooks.beforeDeploy);
+    for (taskName in tasks) {
+      if ( tasks.hasOwnProperty(taskName) ) {
+        task(taskName, tasks[taskName]);
+      }
+    }
 
-    task('beforeUpdateCode', hooks.beforeUpdateCode);
-    task('afterUpdateCode', hooks.afterUpdateCode);
-
-    task('beforeNpm', hooks.beforeNpm);
-    task('afterNpm', hooks.afterNpm);
-
-    task('beforeCreateSymlink', hooks.beforeCreateSymlink);
-    task('afterCreateSymlink', hooks.afterCreateSymlink);
-
-    task('beforeRestart', hooks.beforeRestart);
-    task('afterRestart', hooks.afterRestart);
-
-    task('afterDeploy', hooks.afterDeploy);
-
-    // register hooks
+    // register predefined user tasks order
     before('deploy', 'beforeDeploy');
 
     before('updateCode', 'beforeUpdateCode');
     after('updateCode', 'afterUpdateCode');
 
-    // name of the hook differs from name of the task
     before('npm', 'beforeNpm');
     after('npm', 'afterNpm');
 
-    // name of the hook differs from name of the task
     before('createSymlink', 'beforeCreateSymlink');
     after('createSymlink', 'afterCreateSymlink');
 

@@ -34,7 +34,7 @@ module.exports = function (grunt) {
       repository: data.repository,
       branch: data.branch,
       keepReleases: data.keepReleases,
-      hooks: data.hooks
+      tasks: data.tasks
     }, function init() {
 
       if (tasksToInvoke) {
