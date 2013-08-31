@@ -106,7 +106,7 @@ function Deploy(options, done) {
       run('mkdir -p {{releasePath}}');
 
       that.invokeTasks(
-        ['updateCode', 'npmInstall', 'createSymlink', 'restart', 'deploy:cleanup'],
+        ['updateCode', 'npm', 'createSymlink', 'restart', 'deploy:cleanup'],
         this.async()
       );
     });
@@ -115,7 +115,7 @@ function Deploy(options, done) {
       run('git clone -q -b {{branch}} {{repository}} {{releasePath}}');
     });
 
-    task('npmInstall', function (run) {
+    task('npm', function (run) {
       run('cd {{releasePath}} && test -f {{releasePath}}/package.json && npm install || true');
     });
 
@@ -150,8 +150,8 @@ function Deploy(options, done) {
     task('beforeNpm', hooks.beforeNpm);
     task('afterNpm', hooks.afterNpm);
 
-    task('beforeSymlink', hooks.beforeSymlink);
-    task('afterSymlink', hooks.afterSymlink);
+    task('beforeCreateSymlink', hooks.beforeCreateSymlink);
+    task('afterCreateSymlink', hooks.afterCreateSymlink);
 
     task('beforeRestart', hooks.beforeRestart);
     task('afterRestart', hooks.afterRestart);
@@ -165,12 +165,12 @@ function Deploy(options, done) {
     after('updateCode', 'afterUpdateCode');
 
     // name of the hook differs from name of the task
-    before('npmInstall', 'beforeNpm');
-    after('npmInstall', 'afterNpm');
+    before('npm', 'beforeNpm');
+    after('npm', 'afterNpm');
 
     // name of the hook differs from name of the task
-    before('createSymlink', 'beforeSymlink');
-    after('createSymlink', 'afterSymlink');
+    before('createSymlink', 'beforeCreateSymlink');
+    after('createSymlink', 'afterCreateSymlink');
 
     before('restart', 'beforeRestart');
     after('restart', 'afterRestart');
