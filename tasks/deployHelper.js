@@ -103,7 +103,7 @@ function Deploy(options, done) {
     // Deploy
     task('deploy', function (run) {
       that._folders.latestRelease = that._folders.releasePath;
-      run('mkdir -p {{releasePath}}');
+      run('mkdir -p {{latestRelease}}');
 
       that.invokeTasks(
         ['updateCode', 'npm', 'createSymlink', 'restart', 'deploy:cleanup'],
@@ -112,11 +112,11 @@ function Deploy(options, done) {
     });
 
     task('updateCode', function (run) {
-      run('git clone -q -b {{branch}} {{repository}} {{releasePath}}');
+      run('git clone -q -b {{branch}} {{repository}} {{latestRelease}}');
     });
 
     task('npm', function (run) {
-      run('cd {{releasePath}} && test -f {{releasePath}}/package.json && npm install || true');
+      run('cd {{latestRelease}} && test -f {{latestRelease}}/package.json && npm install || true');
     });
 
     task('createSymlink', function (run) {
