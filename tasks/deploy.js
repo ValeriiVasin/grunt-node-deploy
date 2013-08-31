@@ -15,7 +15,13 @@ module.exports = function (grunt) {
     var data = this.data,
         done = this.async(),
         args = this.args,
+        tasksToInvoke,
         deploy;
+
+    tasksToInvoke = grunt.option('invoke');
+    if (tasksToInvoke) {
+      tasksToInvoke = tasksToInvoke.split(',');
+    }
 
     /**
      * @todo Check params
@@ -30,7 +36,10 @@ module.exports = function (grunt) {
       keepReleases: data.keepReleases,
       hooks: data.hooks
     }, function init() {
-      if ( args.indexOf('setup') !== -1 ) {
+
+      if (tasksToInvoke) {
+        deploy.invokeTasks(tasksToInvoke, done);
+      } else if ( args.indexOf('setup') !== -1 ) {
         // grunt deploy:<env>:setup
         deploy.invokeTask('setup', done);
       } else if ( args.indexOf('rollback') !== -1 ) {
