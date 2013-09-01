@@ -1,98 +1,67 @@
 'use strict';
 
-var Deploy = require('../tasks/deployHelper').Deploy;
+var proxyquire = require('proxyquire'),
+    ExecMock   = require('./mocks').ExecMock;
 
-describe('Commands', function () {
+describe('Deploy.', function () {
   var user = 'user',
       domain = 'domain.com',
       deployTo = '/remote/path',
-      deployFrom = 'releases',
+      repository = 'git@github.com:caolan/async.git',
+      branch = 'master',
+      keepReleases = 3,
+
+      callback = function () {},
+      releasesMock,
+
+      exec,
+
+      Deploy,
       deploy;
 
   beforeEach(function () {
+    releasesMock = ['20130901053034', '20130901062551', '20130901062995'];
+
+    exec = new ExecMock();
+
+    spyOn(console, 'log').andCallFake(callback);
+
+    Deploy = proxyquire('../tasks/deployHelper', {
+      child_process: { exec: exec.mock() }
+    }).Deploy;
+
+    // set response for initial `ls`
+    exec.setResponses( releasesMock.join('\n') );
+
     deploy = new Deploy({
       user: user,
       domain: domain,
       deployTo: deployTo,
-      deployFrom: deployFrom,
-      hooks: {}
-    });
+      repository: repository,
+      branch: branch,
+      keepReleases: keepReleases,
+      tasks: {}
+    }, callback);
+
+    // clear initial commands
+    exec.clear();
   });
 
-  describe('Folders', function () {
-    it('should set correct initial folders values', function () {
-      expect(deploy._folders.current).toBe('/remote/path/current');
-      expect(deploy._folders.shared).toBe('/remote/path/shared');
-      expect(deploy._folders.logs).toBe('/remote/path/logs');
-      expect(deploy._folders.releases).toBe('/remote/path/releases');
-      expect(deploy._folders.currentRelease).toBeNull();
-    });
-  });
-
-  describe('Remote commands', function () {
-    it('shoud store correct commands into internal array', function () {
+  describe('run', function () {
+    it('should run simple command remotely', function () {
       deploy.run('ls');
-      expect(deploy._commands).toEqual(
-        ['ssh user@domain.com "ls"']
-      );
+      deploy.exec(callback);
+
+      expect( exec.recent() ).toBe('ssh -A user@domain.com "ls"');
     });
+  });
 
-    it('should correctly escape commands', function () {
-      deploy.run('echo "hello"');
-      expect(deploy._commands[0]).toBe('ssh user@domain.com "echo \\"hello\\""');
+  describe('runLocally', function () {
+    it('should run simple command', function () {
+      deploy.runLocally('ls');
+      deploy.exec(callback);
 
-      deploy.run('echo \'hello\'');
-      expect(deploy._commands[1]).toBe('ssh user@domain.com "echo \'hello\'"');
+      expect( exec.recent() ).toBe('ls');
     });
-
-    describe('Replace template strings', function () {
-      it('should replace {{user}} with user name', function () {
-        deploy.run('echo "{{user}}"');
-        expect( deploy._commands.pop() ).toBe('ssh user@domain.com "echo \\"user\\""');
-      });
-
-      it('should replace {{domain}} with domain value', function () {
-        deploy.run('echo "{{domain}}"');
-        expect( deploy._commands.pop() ).toBe('ssh user@domain.com "echo \\"domain.com\\""');
-      });
-
-      it('should replace {{current}} with `current` folder path', function () {
-        deploy.run('ls {{current}}');
-        expect( deploy._commands.pop() ).toBe('ssh user@domain.com "ls /remote/path/current"');
-      });
-
-      it('should replace {{releases}} with `releases` folder path', function () {
-        deploy.run('ls {{releases}}');
-        expect( deploy._commands.pop() ).toBe('ssh user@domain.com "ls /remote/path/releases"');
-      });
-
-      it('should replace {{shared}} with `shared` folder path', function () {
-        deploy.run('ls {{shared}}');
-        expect( deploy._commands.pop() ).toBe('ssh user@domain.com "ls /remote/path/shared"');
-      });
-
-      it('should replace {{logs}} with `logs` folder path', function () {
-        deploy.run('ls {{logs}}');
-        expect( deploy._commands.pop() ).toBe('ssh user@domain.com "ls /remote/path/logs"');
-      });
-
-      it('should replace {{currentRelease}} with `currentRelease` folder', function () {
-        deploy._folders.currentRelease = '/remote/path/releases/201308260319';
-        deploy.run('ls {{currentRelease}}');
-        expect( deploy._commands.pop() ).toBe('ssh user@domain.com "ls /remote/path/releases/201308260319"');
-      });
-
-      it('should parse additional templates, provided as second argument', function () {
-        deploy.run('ls {{folder}}', { folder: '/yet/another/folder' });
-        expect( deploy._commands.pop() ).toBe('ssh user@domain.com "ls /yet/another/folder"');
-      });
-
-      it('should throw error if template string could not be replaced', function () {
-        expect(function () {
-          deploy.run('ls {{directory}}');
-        }).toThrow();
-      });
-    });
-
   });
 });
