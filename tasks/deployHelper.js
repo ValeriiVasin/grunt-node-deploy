@@ -322,6 +322,7 @@ Deploy.prototype.invokeTask = function (name, done) {
       taskFn = this._tasks[name],
       run = this.run.bind(this),
       runLocally = this.runLocally.bind(this),
+      onRollback = this._addRollback.bind(this),
       isTaskSync = true,
       taskContext;
 
@@ -329,6 +330,7 @@ Deploy.prototype.invokeTask = function (name, done) {
     throw 'Invoke task `'+ name +'`. You should provide `done` callback.';
   }
 
+  // registered task is not a function. Skip it
   if ( typeof taskFn !== 'function' ) {
     done();
     return;
@@ -336,14 +338,15 @@ Deploy.prototype.invokeTask = function (name, done) {
 
 
   // rollback happened before
-  if (this._idle) {
+  if ( this._idle && !this._isRollback(name) ) {
     done();
     return;
   }
 
-
+  // task invocation queue
   async.series([
-    // we should flush all commands before invoking task
+
+    // flush all commands before invoking task
     function execCommands(callback) {
       that.exec(callback);
     },
@@ -369,7 +372,13 @@ Deploy.prototype.invokeTask = function (name, done) {
         callback();
       }
     }
-  ], done);
+  ], function (error) {
+    if (error) {
+      // error happened: rolling back
+      console.log('Error while executing tasks: ' + (error.message ? error.message : error) );
+      that._rollingBack(done);
+    }
+  });
 
   function invokeTask(callback) {
     var taskContext = {
@@ -386,50 +395,26 @@ Deploy.prototype.invokeTask = function (name, done) {
     try {
       console.log('Executing task: `'+ name +'`');
       taskFn.call(taskContext, run, runLocally, onRollback);
+
+      // task successfully executed
+      if ( isTaskSync ) {
+        taskDone();
+      }
     } catch (e) {
-      console.log('Rolling back...');
-      that._idle = true;
-
-      async.eachSeries(that._rollbacks, invokeRollback, function () {
-        console.log('Rolling back done...');
-        callback();
-      });
-
-      return;
-    }
-
-    // task successfully executed
-    if ( isTaskSync ) {
-      taskDone();
+      callback(e);
     }
 
     function taskDone() {
       that.exec(callback);
     }
   }
-
-  function onRollback(rollbackFn) {
-    that._rollbacks.unshift(rollbackFn);
-  }
-
-  function invokeRollback(rollbackFn, done) {
-    var isAsync = false;
-
-    rollbackFn.call({
-      async: function () {
-        isAsync = true;
-        return done;
-      }
-    });
-
-    if ( !isAsync ) {
-      done();
-    }
-  }
 };
 
 /**
+ * Invoke few tasks
+ *
  * @method invokeTasks
+ *
  * @param {String[]} tasks  Array of tasks to invoke
  * @param {Function} done   Callback
  */
@@ -440,6 +425,55 @@ Deploy.prototype.invokeTasks = function (tasks, done) {
     that.invokeTask(name, callback);
   }, done);
 };
+
+/**
+ * Add rollback task
+ *
+ * @method _addRollback
+ * @private
+ *
+ * @param  {Function} rollbackFn Rollback task function
+ */
+Deploy.prototype._addRollback = function (rollbackFn) {
+  // generate uniq rollback name
+  var name = _.uniqueId('__rollback__');
+
+  this.task(name, rollbackFn);
+  this._rollbacks.unshift(name);
+};
+
+/**
+ * Check if task is a rollback task
+ *
+ * @method _isRollback
+ * @private
+ *
+ * @param  {String} name Task name
+ * @return {Boolean}     Result
+ */
+Deploy.prototype._isRollback = function (name) {
+  return this._rollbacks.indexOf(name) !== -1;
+};
+
+/**
+ * Invoke all registered rollbacks (when something went wrong)
+ *
+ * @method _rollback
+ * @private
+ *
+ * @param  {Function} done Callback
+ */
+Deploy.prototype._rollingBack = function (done) {
+  console.log('Rolling back...');
+
+  // this flag means that something went wrong and we are in rollbacks stage
+  // All tasks that are in the queue should be skipped
+  this._idle = true;
+
+  // invoke rollback tasks
+  this.invokeTasks(this._rollbacks, done);
+};
+
 
 /**
  * Expand command: augment with variables, e.g. folders, user, domain
