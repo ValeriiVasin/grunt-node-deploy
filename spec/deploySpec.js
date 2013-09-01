@@ -67,12 +67,24 @@ describe('Deploy.', function () {
 
   describe('Tasks', function () {
     beforeEach(function () {
+      jasmine.Clock.useMock();
+
       deploy.task('hello', function (run) {
         run('ls hello/');
       });
 
       deploy.task('world', function (run, runLocally) {
         runLocally('ls world/');
+      });
+
+      deploy.task('async', function (run, runLocally) {
+        var done = this.async();
+
+        run('ls one/');
+        setTimeout(function () {
+          runLocally('ls two/');
+          done();
+        }, 50);
       });
     });
 
@@ -91,6 +103,16 @@ describe('Deploy.', function () {
       expect( exec.commands() ).toEqual([
         'ssh -A user@domain.com "ls hello/"',
         'ls world/'
+      ]);
+    });
+
+    it('should run async task', function () {
+      deploy.invokeTask('async', callback);
+
+      jasmine.Clock.tick(50);
+      expect( exec.commands() ).toEqual([
+        'ssh -A user@domain.com "ls one/"',
+        'ls two/'
       ]);
     });
   });
