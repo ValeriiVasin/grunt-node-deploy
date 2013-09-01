@@ -65,7 +65,7 @@ describe('Deploy.', function () {
     });
   });
 
-  describe('Tasks', function () {
+  describe('Tasks.', function () {
     beforeEach(function () {
       jasmine.Clock.useMock();
 
@@ -114,6 +114,50 @@ describe('Deploy.', function () {
         'ssh -A user@domain.com "ls one/"',
         'ls two/'
       ]);
+    });
+
+    describe('Before and After tasks.', function () {
+      beforeEach(function () {
+        deploy.task('beforeTask', function (run) {
+          run('ls before/');
+        });
+
+        deploy.task('afterTask', function (run) {
+          run('ls after/');
+        });
+      });
+
+      it('should run task before the task', function () {
+        deploy.before('hello', 'beforeTask');
+        deploy.invokeTask('hello', callback);
+
+        expect( exec.commands() ).toEqual([
+          'ssh -A user@domain.com "ls before/"',
+          'ssh -A user@domain.com "ls hello/"'
+        ]);
+      });
+
+      it('should run task after the task', function () {
+        deploy.after('hello', 'afterTask');
+        deploy.invokeTask('hello', callback);
+
+        expect( exec.commands() ).toEqual([
+          'ssh -A user@domain.com "ls hello/"',
+          'ssh -A user@domain.com "ls after/"'
+        ]);
+      });
+
+      it('should run tasks before and after', function () {
+        deploy.before('hello', 'beforeTask');
+        deploy.after('hello', 'afterTask');
+        deploy.invokeTask('hello', callback);
+
+        expect( exec.commands() ).toEqual([
+          'ssh -A user@domain.com "ls before/"',
+          'ssh -A user@domain.com "ls hello/"',
+          'ssh -A user@domain.com "ls after/"'
+        ]);
+      });
     });
   });
 });
