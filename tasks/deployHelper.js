@@ -24,7 +24,6 @@ _.templateSettings = {
  * @param {String} options.repository         Git repository of project
  * @param {String} [options.branch='master']  Git branch that will be used for deploy
  *
- * @param {String} [options.deployFrom]       Remote folder to deploy from
  * @param {String} [options.keepReleases=3]   Amount of releases to keep
  */
 function Deploy(options, done) {

@@ -30,7 +30,6 @@ module.exports = function (grunt) {
       user: data.user,
       domain: data.domain,
       deployTo: data.deployTo,
-      deployFrom: data.deployFrom,
       repository: data.repository,
       branch: data.branch,
       keepReleases: data.keepReleases,
