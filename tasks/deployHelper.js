@@ -377,6 +377,8 @@ Deploy.prototype.invokeTask = function (name, done) {
       // error happened: rolling back
       console.log('Error while executing tasks: ' + (error.message ? error.message : error) );
       that._rollingBack(done);
+    } else {
+      done();
     }
   });
 

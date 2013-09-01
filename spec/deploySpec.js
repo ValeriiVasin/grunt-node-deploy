@@ -64,4 +64,34 @@ describe('Deploy.', function () {
       expect( exec.recent() ).toBe('ls');
     });
   });
+
+  describe('Tasks', function () {
+    beforeEach(function () {
+      deploy.task('hello', function (run) {
+        run('ls hello/');
+      });
+
+      deploy.task('world', function (run, runLocally) {
+        runLocally('ls world/');
+      });
+    });
+
+    it('should run basic remote task', function () {
+      deploy.invokeTask('hello', callback);
+      expect( exec.recent() ).toBe('ssh -A user@domain.com "ls hello/"');
+    });
+
+    it('should run basic local task', function () {
+      deploy.invokeTask('world', callback);
+      expect( exec.recent() ).toBe('ls world/');
+    });
+
+    it('should invoke few tasks', function () {
+      deploy.invokeTasks(['hello', 'world'], callback);
+      expect( exec.commands() ).toEqual([
+        'ssh -A user@domain.com "ls hello/"',
+        'ls world/'
+      ]);
+    });
+  });
 });
