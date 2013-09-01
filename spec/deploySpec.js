@@ -158,6 +158,19 @@ describe('Deploy.', function () {
           'ssh -A user@domain.com "ls after/"'
         ]);
       });
+
+      it('should run tasks before and after', function () {
+        deploy.before('hello', 'beforeTask');
+        deploy.after('hello', 'afterTask');
+        deploy.invokeTasks(['hello', 'world'], callback);
+
+        expect( exec.commands() ).toEqual([
+          'ssh -A user@domain.com "ls before/"',
+          'ssh -A user@domain.com "ls hello/"',
+          'ssh -A user@domain.com "ls after/"',
+          'ls world/'
+        ]);
+      });
     });
   });
 });
