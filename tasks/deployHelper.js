@@ -102,7 +102,6 @@ function Deploy(options, done) {
     // Deploy
     task('deploy', function (run) {
       that._folders.latestRelease = that._folders.releasePath;
-      run('mkdir -p {{latestRelease}}');
 
       that.invokeTasks(
         ['updateCode', 'npm', 'createSymlink', 'restart', 'deploy:cleanup'],
@@ -110,15 +109,28 @@ function Deploy(options, done) {
       );
     });
 
-    task('updateCode', function (run) {
-      run('git clone -q -b {{branch}} {{repository}} {{latestRelease}}');
+    task('updateCode', function (run, runLocally, onRollback) {
+      onRollback(function () {
+        run("rm -rf {{releasePath}}; true");
+      });
+
+      run('mkdir -p {{releasePath}}');
+      run('git clone -q -b {{branch}} {{repository}} {{releasePath}}');
     });
 
     task('npm', function (run) {
       run('cd {{latestRelease}} && test -f {{latestRelease}}/package.json && npm install || true');
     });
 
-    task('createSymlink', function (run) {
+    task('createSymlink', function (run, runLocally, onRollback) {
+      onRollback(function () {
+        if ( that._folders.previousRelease ) {
+          run ('rm -f {{currentPath}}; ln -s {{previousRelease}} {{currentPath}}; true');
+        } else {
+          console.log('No previous release to rollback to, rollback of symlink skipped');
+        }
+      });
+
       run('rm -f {{currentPath}} && ln -s {{latestRelease}} {{currentPath}}');
     });
 
@@ -227,7 +239,6 @@ Deploy.prototype.exec = function (done) {
   });
 };
 
-
 /**
  * Register task
  *
@@ -314,23 +325,25 @@ Deploy.prototype.invokeTask = function (name, done) {
       isTaskSync = true,
       taskContext;
 
+  if (typeof done !== 'function') {
+    throw 'Invoke task `'+ name +'`. You should provide `done` callback.';
+  }
+
   if ( typeof taskFn !== 'function' ) {
     done();
     return;
   }
 
-  if (typeof done !== 'function') {
-    throw 'Invoke task `'+ name +'`. You should provide `done` callback.';
-  }
 
   // rollback happened before
   if (this._idle) {
+    done();
     return;
   }
 
-  // we should flush all commands before invoking task
 
   async.series([
+    // we should flush all commands before invoking task
     function execCommands(callback) {
       that.exec(callback);
     },
