@@ -15,13 +15,7 @@ module.exports = function (grunt) {
     var data = this.data,
         done = this.async(),
         args = this.args,
-        tasksToInvoke,
         deploy;
-
-    tasksToInvoke = grunt.option('invoke');
-    if (tasksToInvoke) {
-      tasksToInvoke = tasksToInvoke.split(',');
-    }
 
     /**
      * @todo Check params
@@ -36,17 +30,33 @@ module.exports = function (grunt) {
       tasks: data.tasks
     }, function init() {
 
-      if (tasksToInvoke) {
-        deploy.invokeTasks(tasksToInvoke, done);
-      } else if ( args.indexOf('setup') !== -1 ) {
-        // grunt deploy:<env>:setup
-        deploy.invokeTask('setup', done);
-      } else if ( args.indexOf('rollback') !== -1 ) {
-        // grunt deploy:<env>:rollback
-        deploy.invokeTask('rollback', done);
-      } else {
-        deploy.invokeTask('deploy', done);
+      // grunt deploy:<env> --exec="ls -lah"
+      if ( typeof grunt.option('exec') !== 'undefined' ) {
+        deploy.run( grunt.option('exec') );
+        deploy.exec(done);
+        return;
       }
+
+      // grunt deploy:<env> --invoke=task1,task2
+      if ( typeof grunt.option('invoke') === 'string' ) {
+        deploy.invokeTasks(grunt.option('invoke').split(','), done);
+        return;
+      }
+
+      // grunt deploy:<env> --setup
+      if ( grunt.option('setup') ) {
+        deploy.invokeTask('setup', done);
+        return;
+      }
+
+      // grunt deploy:<env> --rollback
+      if ( grunt.option('rollback') ) {
+        deploy.invokeTask('rollback', done);
+        return;
+      }
+
+      // default task: deploy
+      deploy.invokeTask('deploy', done);
     });
   });
 };
