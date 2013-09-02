@@ -341,13 +341,6 @@ Deploy.prototype.invokeTask = function (name, done) {
     return;
   }
 
-
-  // rollback happened before
-  if ( this._idle && !this._isRollback(name) ) {
-    done();
-    return;
-  }
-
   // task invocation queue
   async.series([
 
@@ -381,7 +374,13 @@ Deploy.prototype.invokeTask = function (name, done) {
     if (error) {
       // error happened: rolling back
       console.log('Error while executing tasks: ' + (error.message ? error.message : error) );
-      that._rollingBack(done);
+
+      // check if we are not currently in rollback phase
+      if ( that._idle ) {
+        done();
+      } else {
+        that._rollingBack(done);
+      }
     } else {
       done();
     }
@@ -397,6 +396,12 @@ Deploy.prototype.invokeTask = function (name, done) {
         return taskDone;
       }
     };
+
+    // skip task if rollback happened before
+    if ( that._idle && !that._isRollback(name) ) {
+      done();
+      return;
+    }
 
     // invoke task
     try {
