@@ -172,5 +172,38 @@ describe('Deploy.', function () {
         ]);
       });
     });
+
+    // task that contains another task (inside)
+    describe('Nested tasks', function () {
+      beforeEach(function () {
+        deploy.task('A', function (run) {
+          run('ls A/');
+        });
+
+        deploy.task('B', function (run, runLocally) {
+          var done = this.async();
+
+          runLocally('ls B/');
+          run('ls C/');
+
+          deploy.invokeTask('A', function () {
+            runLocally('uptime');
+            done();
+          });
+        });
+      });
+
+      it('should work fine', function () {
+
+        deploy.invokeTask('B', callback);
+
+        expect( exec.commands() ).toEqual([
+          'ls B/',
+          'ssh -A user@domain.com "ls C/"',
+          'ssh -A user@domain.com "ls A/"',
+          'uptime'
+        ]);
+      });
+    });
   });
 });
