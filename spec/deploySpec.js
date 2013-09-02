@@ -215,4 +215,120 @@ describe('Deploy.', function () {
       });
     });
   });
+
+  describe('Rollbacks', function () {
+
+    beforeEach(function () {
+      deploy.task('A', function (run, runLocally, onRollback) {
+        onRollback(function () {
+          run('rm -Rf a/b/c');
+        });
+
+        run('mkdir -p a/b/c');
+      });
+
+      deploy.task('B', function (run, runLocally, onRollback) {
+        onRollback(function () {
+          run('rm -Rf c/b/a');
+        });
+
+        run('mkdir -p c/b/a');
+      });
+
+      deploy.task('error', function (run, runLocally, onRollback) {
+        onRollback(function () {
+          runLocally('rm -rf debug.log');
+        });
+
+        runLocally('touch debug.log');
+        throw 'Something went wrong';
+      });
+    });
+
+    it('should work properly if error happens in `before` task', function () {
+      deploy.before('A', 'error');
+      deploy.invokeTask('A', callback);
+
+      expect( exec.commands() ).toEqual([
+        'touch debug.log',
+        'rm -rf debug.log'
+      ]);
+    });
+
+    it('should work properly if error happens in `task`', function () {
+      deploy.before('error', 'A');
+      deploy.after('error', 'B');
+      deploy.invokeTask('error', callback);
+
+      expect( exec.commands() ).toEqual([
+        'ssh -A user@domain.com "mkdir -p a/b/c"',
+        'touch debug.log',
+        'rm -rf debug.log',
+        'ssh -A user@domain.com "rm -Rf a/b/c"'
+      ]);
+    });
+
+    it('should work properly if error happens in `after` task', function () {
+      // B => A => error
+      deploy.before('A', 'B');
+      deploy.after('A', 'error');
+      deploy.invokeTask('A', callback);
+
+      expect( exec.commands() ).toEqual([
+        'ssh -A user@domain.com "mkdir -p c/b/a"',
+        'ssh -A user@domain.com "mkdir -p a/b/c"',
+        'touch debug.log',
+
+        'rm -rf debug.log',
+        'ssh -A user@domain.com "rm -Rf a/b/c"',
+        'ssh -A user@domain.com "rm -Rf c/b/a"'
+      ]);
+    });
+
+    it('should work properly if error happens in tasks queue', function () {
+      deploy.invokeTasks(['A', 'B', 'error'], callback);
+
+      expect( exec.commands() ).toEqual([
+        'ssh -A user@domain.com "mkdir -p a/b/c"',
+        'ssh -A user@domain.com "mkdir -p c/b/a"',
+        'touch debug.log',
+
+        'rm -rf debug.log',
+        'ssh -A user@domain.com "rm -Rf c/b/a"',
+        'ssh -A user@domain.com "rm -Rf a/b/c"'
+      ]);
+    });
+
+    it('should work properly if error happens in nested task', function () {
+      // A => nested => B => error
+      deploy.task('nested', function (run, runLocally, onRollback) {
+        var async = this.async();
+
+        onRollback(function () {
+          run('rm -Rf nested');
+        });
+
+        run('mkdir -p nested');
+
+        deploy.invokeTasks(['B', 'error'], async);
+      });
+
+      deploy.before('nested', 'A');
+      deploy.invokeTask('nested', callback);
+
+      expect( exec.commands() ).toEqual([
+        'ssh -A user@domain.com "mkdir -p a/b/c"',
+        'ssh -A user@domain.com "mkdir -p nested"',
+        'ssh -A user@domain.com "mkdir -p c/b/a"',
+        'touch debug.log',
+
+        'rm -rf debug.log',
+        'ssh -A user@domain.com "rm -Rf c/b/a"',
+        'ssh -A user@domain.com "rm -Rf nested"',
+        'ssh -A user@domain.com "rm -Rf a/b/c"'
+      ]);
+    });
+
+    // check errors that happen not via `throw` => usual callback('Error message');
+  });
 });
