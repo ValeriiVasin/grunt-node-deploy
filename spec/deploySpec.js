@@ -47,21 +47,30 @@ describe('Deploy.', function () {
     exec.clear();
   });
 
-  describe('run', function () {
+  describe('Basics', function () {
     it('should run simple command remotely', function () {
       deploy.run('ls');
       deploy.exec(callback);
 
       expect( exec.recent() ).toBe('ssh -A user@domain.com "ls"');
     });
-  });
 
-  describe('runLocally', function () {
     it('should run simple command', function () {
       deploy.runLocally('ls');
       deploy.exec(callback);
 
       expect( exec.recent() ).toBe('ls');
+    });
+
+    it('should escape only remote command', function () {
+      deploy.run('echo "hello"');
+      deploy.runLocally('echo "hello"');
+      deploy.exec(callback);
+
+      expect( exec.commands() ).toEqual([
+        'ssh -A user@domain.com "echo \\\"hello\\\""',
+        'echo "hello"'
+      ]);
     });
   });
 

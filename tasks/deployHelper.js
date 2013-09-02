@@ -190,8 +190,13 @@ function Deploy(options, done) {
 Deploy.prototype.run = function (command, options) {
   options = _.extend({ quiet: false, local: false }, options || {});
 
+  command = this._expandCommand(command);
+  if ( !options.local ) {
+    command = this._shellEscape(command);
+  }
+
   this._commands.push({
-    command: this._shellEscape( this._expandCommand(command) ),
+    command: command,
     local: options.local,
     quiet: options.quiet
   });
