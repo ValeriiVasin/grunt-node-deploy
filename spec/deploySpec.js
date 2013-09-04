@@ -168,7 +168,7 @@ describe('Deploy.', function () {
         ]);
       });
 
-      it('should run tasks before and after', function () {
+      it('should run tasks before and after in conjunction with .invokeTasks', function () {
         deploy.before('hello', 'beforeTask');
         deploy.after('hello', 'afterTask');
         deploy.invokeTasks(['hello', 'world'], callback);
@@ -178,6 +178,30 @@ describe('Deploy.', function () {
           'ssh -A user@domain.com "ls hello/"',
           'ssh -A user@domain.com "ls after/"',
           'ls world/'
+        ]);
+      });
+
+      it('should run before tasks in order', function () {
+        deploy.before('hello', 'beforeTask');
+        deploy.before('hello', 'afterTask');
+        deploy.invokeTask('hello', callback);
+
+        expect( exec.commands() ).toEqual([
+          'ssh -A user@domain.com "ls before/"',
+          'ssh -A user@domain.com "ls after/"',
+          'ssh -A user@domain.com "ls hello/"'
+        ]);
+      });
+
+      it('should run after tasks in order', function () {
+        deploy.after('hello', 'beforeTask');
+        deploy.after('hello', 'afterTask');
+        deploy.invokeTask('hello', callback);
+
+        expect( exec.commands() ).toEqual([
+          'ssh -A user@domain.com "ls hello/"',
+          'ssh -A user@domain.com "ls before/"',
+          'ssh -A user@domain.com "ls after/"'
         ]);
       });
     });
@@ -325,6 +349,58 @@ describe('Deploy.', function () {
         'rm -rf debug.log',
         'ssh -A user@domain.com "rm -Rf c/b/a"',
         'ssh -A user@domain.com "rm -Rf nested"',
+        'ssh -A user@domain.com "rm -Rf a/b/c"'
+      ]);
+    });
+
+    it('should properly work with rollbacks queue', function () {
+      deploy.task('multirollbacks', function (run, runLocally, onRollback) {
+        onRollback(function (run) {
+          run('ls one/');
+        });
+
+        onRollback(function (run) {
+          run('ls two/');
+        });
+
+        run('ls');
+      });
+
+      deploy.before('error', 'multirollbacks');
+      deploy.invokeTask('error', callback);
+
+      expect( exec.commands() ).toEqual([
+        'ssh -A user@domain.com "ls"',
+        'touch debug.log',
+        'rm -rf debug.log',
+        'ssh -A user@domain.com "ls two/"',
+        'ssh -A user@domain.com "ls one/"'
+      ]);
+    });
+
+    it('should skip errors in rollbacks', function () {
+      deploy.task('rollbackError', function (run, runLocally, onRollback) {
+        onRollback(function () {
+          run('rm -rf three/');
+          throw 'something went wrong';
+        });
+
+        run('mkdir three/');
+      });
+
+      deploy.before('rollbackError', 'A');
+      deploy.after('rollbackError', 'error');
+
+      // A => rollbackError => error
+      deploy.invokeTask('rollbackError', callback);
+
+      expect( exec.commands() ).toEqual([
+        'ssh -A user@domain.com "mkdir -p a/b/c"',
+        'ssh -A user@domain.com "mkdir three/"',
+        'touch debug.log',
+
+        'rm -rf debug.log',
+        'ssh -A user@domain.com "rm -rf three/"',
         'ssh -A user@domain.com "rm -Rf a/b/c"'
       ]);
     });
