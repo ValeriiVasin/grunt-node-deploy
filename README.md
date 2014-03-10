@@ -17,69 +17,45 @@ Once the plugin has been installed, it may be enabled inside your Gruntfile with
 grunt.loadNpmTasks('grunt-node-deploy');
 ```
 
-## The "node_deploy" task
+## Documentation
 
-### Overview
-In your project's Gruntfile, add a section named `node_deploy` to the data object passed into `grunt.initConfig()`.
+###Example config
+
+Basic configuration
 
 ```js
 grunt.initConfig({
   deploy: {
-    options: {
-      // Task-specific options go here.
-    },
     production: {
-      // Target-specific file lists and/or options go here.
+      // source git repository to fetch release from
+      repository: 'git@github.com:BonsaiDen/JavaScript-Garden.git',
+      // Repository branch. Default: 'master'
+      branch: 'beta',
+
+      // amount of releases to keep on the server. Default: 3
+      keepReleases: 5,
+
+      // server options
+      user:     'test',
+      domain:   'my.domain.com',
+      deployTo: '/opt/www/my.domain.com',
+
+      // your tasks
+      tasks: {
+        afterNpm: function (run) {
+          run('cd {{latestRelease}}; node build');
+          run('mv {{latestRelease}}/{site,public}');
+        },
+
+        restart: function (run) {
+          run('/etc/init.d/nginx restart');
+        }
+      }
     }
-  },
-})
-```
+  }
+});
 
-### Options
-
-#### options.separator
-Type: `String`
-Default value: `',  '`
-
-A string value that is used to do something with whatever.
-
-#### options.punctuation
-Type: `String`
-Default value: `'.'`
-
-A string value that is used to do something else with whatever else.
-
-### Usage Examples
-
-#### Default Options
-In this example, the default options are used to do something with whatever. So if the `testing` file has the content `Testing` and the `123` file had the content `1 2 3`, the generated result would be `Testing, 1 2 3.`
-
-```js
-grunt.initConfig({
-  deploy: {
-    options: {},
-    files: {
-      'dest/default_options': ['src/testing', 'src/123'],
-    },
-  },
-})
-```
-
-#### Custom Options
-In this example, custom options are used to do something else with whatever else. So if the `testing` file has the content `Testing` and the `123` file had the content `1 2 3`, the generated result in this case would be `Testing: 1 2 3 !!!`
-
-```js
-grunt.initConfig({
-  deploy: {
-    options: {
-      separator: ': ',
-      punctuation: ' !!!',
-    },
-    files: {
-      'dest/default_options': ['src/testing', 'src/123'],
-    },
-  },
-})
+grunt.loadNpmTasks('grunt-node-deploy');
 ```
 
 ## Contributing
@@ -87,3 +63,5 @@ In lieu of a formal styleguide, take care to maintain the existing coding style.
 
 ## Release History
 _(Nothing yet)_
+
+Inspired by [Capistrano](https://github.com/capistrano/capistrano)
