@@ -32,17 +32,13 @@
     "underscore": "~1.5.1",
     "async": "~0.2.9",
     "colors": "~0.6.2",
-    "moment": "~2.1.0"
+    "moment": "~2.1.0",
+    "grunt": "~0.4.1"
   },
   "devDependencies": {
-    "grunt-contrib-jshint": "~0.6.0",
-    "grunt-contrib-clean": "~0.4.0",
-    "grunt-contrib-nodeunit": "~0.2.0",
-    "grunt": "~0.4.1",
-    "jasmine-node": "~1.11.0",
-    "proxyquire": "~0.5.1",
+    "grunt-contrib-jshint": "^0.6.0",
     "grunt-jasmine-node": "^0.1.0",
-    "grunt": "~0.4.1"
+    "proxyquire": "^0.5.1"
   },
   "keywords": [
     "gruntplugin",
