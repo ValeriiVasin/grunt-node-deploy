@@ -24,13 +24,13 @@ In your project's Gruntfile, add a section named `node_deploy` to the data objec
 
 ```js
 grunt.initConfig({
-  node_deploy: {
+  deploy: {
     options: {
       // Task-specific options go here.
     },
-    your_target: {
+    production: {
       // Target-specific file lists and/or options go here.
-    },
+    }
   },
 })
 ```
@@ -56,7 +56,7 @@ In this example, the default options are used to do something with whatever. So 
 
 ```js
 grunt.initConfig({
-  node_deploy: {
+  deploy: {
     options: {},
     files: {
       'dest/default_options': ['src/testing', 'src/123'],
@@ -70,7 +70,7 @@ In this example, custom options are used to do something else with whatever else
 
 ```js
 grunt.initConfig({
-  node_deploy: {
+  deploy: {
     options: {
       separator: ': ',
       punctuation: ' !!!',
