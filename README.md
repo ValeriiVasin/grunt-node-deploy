@@ -30,7 +30,7 @@ grunt.initConfig({
       // source git repository to fetch release from
       repository: 'git@github.com:BonsaiDen/JavaScript-Garden.git',
       // Repository branch. Default: 'master'
-      branch: 'beta',
+      branch: 'gh-pages',
 
       // amount of releases to keep on the server. Default: 3
       keepReleases: 5,
