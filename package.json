@@ -1,7 +1,7 @@
 {
   "name": "grunt-node-deploy",
   "description": "Deployment tool for grunt.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "homepage": "https://github.com/ValeriiVasin/grunt-node-deploy",
   "author": {
     "name": "Valerii Vasin",
