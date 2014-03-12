@@ -6,6 +6,8 @@ var moment = require('moment');
 var _      = require('underscore');
 var path   = require('path');
 
+var defaultTasks = require('./defaultTasks');
+
 _.templateSettings = {
   interpolate : /\{\{(.+?)\}\}/g
 };
@@ -69,113 +71,43 @@ function Deploy(options, done) {
     // for current release it will be redefined to {{releasePath}}
     folders.latestRelease = folders.currentRelease;
 
-    registerTasks();
+    registerTasks(defaultTasks);
     registerUserTasks();
     done();
   });
 
-  function registerTasks() {
-    var task = that.task.bind(that),
-        invokeTask = that.invokeTask.bind(that);
+  function registerTasks(tasks) {
+    var taskName;
 
-    task('setup', function (run) {
-      run('mkdir -p {{releasesPath}} {{logsPath}} {{sharedPath}}');
-    });
-
-    // restart your app, currently it's empty, could be redefined
-    task('restart');
-
-    // Rollback
-    task('rollback', function (run) {
-      if ( that._folders.previousRelease ) {
-        run('rm -Rf {{currentPath}}; ln -s {{previousRelease}} {{currentPath}}');
-        invokeTask('rollback:cleanup', this.async());
-      } else {
-        throw 'Rolling back is impossible, there are less then 2 releases.';
+    for (taskName in tasks) {
+      if ( tasks.hasOwnProperty(taskName) ) {
+        that.task(taskName, tasks[taskName]);
       }
-    });
-
-    task('rollback:cleanup', function (run) {
-      run('if [ `readlink {{currentPath}}` != {{currentRelease}} ]; then rm -rf {{currentRelease}}; fi');
-    });
-
-    // Deploy
-    task('deploy', function (run) {
-      that._folders.latestRelease = that._folders.releasePath;
-
-      that.invokeTasks(
-        ['updateCode', 'npm', 'createSymlink', 'restart', 'deploy:cleanup'],
-        this.async()
-      );
-    });
-
-    task('updateCode', function (run, runLocally, onRollback) {
-      onRollback(function () {
-        run("rm -rf {{releasePath}}; true");
-      });
-
-      run('mkdir -p {{releasePath}}');
-      run('git clone -q -b {{branch}} {{repository}} {{releasePath}}');
-    });
-
-    task('npm', function (run) {
-      run('cd {{latestRelease}} && test -f {{latestRelease}}/package.json && npm install || true');
-    });
-
-    task('createSymlink', function (run, runLocally, onRollback) {
-      onRollback(function () {
-        if ( that._folders.previousRelease ) {
-          run ('rm -f {{currentPath}}; ln -s {{previousRelease}} {{currentPath}}; true');
-        } else {
-          console.log('No previous release to rollback to, rollback of symlink skipped');
-        }
-      });
-
-      run('rm -f {{currentPath}} && ln -s {{latestRelease}} {{currentPath}}');
-    });
-
-    task('deploy:cleanup', function (run) {
-      run([
-        'ls -1td {{releasesPath}}/*',
-        'tail -n +' + (that.options.keepReleases + 1),
-        'xargs rm -rf'
-      ].join(' | '), { quiet: true });
-    });
+    }
   }
 
   /**
-   * Register user-callbacks defined tasks
+   * Register user defined tasks
    */
   function registerUserTasks() {
-    var tasks  = options.tasks,
-        task   = that.task.bind(that),
-        before = that.before.bind(that),
-        after  = that.after.bind(that),
-        taskName;
-
-    // register user tasks
-    for (taskName in tasks) {
-      if ( tasks.hasOwnProperty(taskName) ) {
-        task(taskName, tasks[taskName]);
-      }
-    }
+    registerTasks(options.tasks);
 
     // register predefined user tasks order
-    before('deploy', 'beforeDeploy');
+    that.before('deploy', 'beforeDeploy');
 
-    before('updateCode', 'beforeUpdateCode');
-    after('updateCode', 'afterUpdateCode');
+    that.before('updateCode', 'beforeUpdateCode');
+    that.after('updateCode', 'afterUpdateCode');
 
-    before('npm', 'beforeNpm');
-    after('npm', 'afterNpm');
+    that.before('npm', 'beforeNpm');
+    that.after('npm', 'afterNpm');
 
-    before('createSymlink', 'beforeCreateSymlink');
-    after('createSymlink', 'afterCreateSymlink');
+    that.before('createSymlink', 'beforeCreateSymlink');
+    that.after('createSymlink', 'afterCreateSymlink');
 
-    before('restart', 'beforeRestart');
-    after('restart', 'afterRestart');
+    that.before('restart', 'beforeRestart');
+    that.after('restart', 'afterRestart');
 
-    after('deploy', 'afterDeploy');
+    that.after('deploy', 'afterDeploy');
   }
 }
 
@@ -328,8 +260,7 @@ Deploy.prototype.invokeTask = function (name, done) {
       run = this.run.bind(this),
       runLocally = this.runLocally.bind(this),
       onRollback = this._addRollback.bind(this),
-      isTaskSync = true,
-      taskContext;
+      isTaskSync = true;
 
   if (typeof done !== 'function') {
     throw 'Invoke task `'+ name +'`. You should provide `done` callback.';
@@ -394,7 +325,11 @@ Deploy.prototype.invokeTask = function (name, done) {
       async: function () {
         isTaskSync = false;
         return taskDone;
-      }
+      },
+
+      invoke:  that.invokeTasks.bind(that),
+      folders: that._folders,
+      options: that.options
     };
 
     // skip task if rollback happened before
@@ -427,11 +362,16 @@ Deploy.prototype.invokeTask = function (name, done) {
  *
  * @method invokeTasks
  *
- * @param {String[]} tasks  Array of tasks to invoke
- * @param {Function} done   Callback
+ * @param {Array|String} tasks  Task or array of tasks to invoke
+ * @param {Function}     done   Callback
  */
 Deploy.prototype.invokeTasks = function (tasks, done) {
   var that = this;
+
+  // allow invoke single task
+  if ( !Array.isArray(tasks) ) {
+    tasks = [tasks];
+  }
 
   async.eachSeries(tasks, function (name, callback) {
     that.invokeTask(name, callback);

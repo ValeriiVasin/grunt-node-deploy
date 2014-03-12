@@ -47,6 +47,8 @@
     "gruntplugin",
     "deploy",
     "deployment",
-    "capistrano"
+    "capistrano",
+    "server",
+    "remote"
   ]
 }
