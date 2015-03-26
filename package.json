@@ -26,7 +26,7 @@
     "node": ">= 0.8.0"
   },
   "scripts": {
-    "test": "grunt test"
+    "test": "./node_modules/grunt-cli/bin/grunt test"
   },
   "dependencies": {
     "underscore": "^1.5.1",
@@ -35,10 +35,11 @@
     "moment": "^2.1.0"
   },
   "devDependencies": {
+    "grunt": "~0.4.0",
+    "grunt-cli": "^0.1.13",
     "grunt-contrib-jshint": "^0.6.0",
     "grunt-jasmine-node": "^0.1.0",
-    "proxyquire": "^0.5.1",
-    "grunt": "~0.4.0"
+    "proxyquire": "^0.5.1"
   },
   "peerDependencies": {
     "grunt": "~0.4.0"
