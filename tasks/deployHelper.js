@@ -496,15 +496,14 @@ Deploy.prototype._rollingBack = function (done) {
 Deploy.prototype._expandCommand = function (command) {
   var data = _.extend({}, this.options, this._folders);
 
-  return _.template(command, data);
+  return _.template(command)(data);
 };
 
 /**
  * Convert command to remote
  */
 Deploy.prototype._remoteCommand = function (command) {
-  return _.template(
-    'ssh -A {{host}} "{{command}}"',
+  return _.template('ssh -A {{host}} "{{command}}"')(
     { host: this.options.user + '@' + this.options.domain, command: command }
   );
 };
