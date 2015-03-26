@@ -1,4 +1,4 @@
-# grunt-node-deploy
+# grunt-node-deploy [![Build Status](https://travis-ci.org/ValeriiVasin/grunt-node-deploy.svg?branch=master)](https://travis-ci.org/ValeriiVasin/grunt-node-deploy)
 
 > Deployment tool for grunt.
 
